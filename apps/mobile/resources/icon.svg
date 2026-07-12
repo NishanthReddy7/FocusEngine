@@ -1,0 +1,73 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!--
+    FocusEngine app icon: Session Dial motif (docs/V2_ADDENDUM.md A6, docs/DESIGN_SPEC.md §2).
+    60 tick marks in a ring, generated via rotation transforms (6deg apart, 360/60),
+    one rect per tick; see the generator used to produce these exact coordinates
+    at scratchpad/gen_ticks.js (icon params: cx=cy=512, rOuter=400, tickLen=80, tickWidth=10).
+    Colors from DESIGN_SPEC.md §3 Theme "Studio": bg token #111013, work token #E2A33D.
+    Source image for the capacitor assets generator (android target); produces legacy
+    plus adaptive icons. Note for editors: XML comments may not contain two consecutive
+    hyphens, so avoid the literal CSS token/flag spellings in here.
+  -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#111013"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(0 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(6 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(12 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(18 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(24 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(30 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(36 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(42 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(48 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(54 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(60 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(66 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(72 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(78 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(84 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(90 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(96 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(102 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(108 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(114 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(120 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(126 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(132 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(138 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(144 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(150 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(156 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(162 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(168 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(174 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(180 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(186 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(192 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(198 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(204 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(210 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(216 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(222 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(228 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(234 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(240 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(246 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(252 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(258 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(264 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(270 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(276 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(282 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(288 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(294 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(300 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(306 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(312 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(318 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(324 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(330 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(336 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(342 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(348 512 512)"/>
+  <rect x="507.00" y="112.00" width="10" height="80" fill="#E2A33D" transform="rotate(354 512 512)"/>
+</svg>

@@ -1,0 +1,74 @@
+<svg width="2732" height="2732" viewBox="0 0 2732 2732" xmlns="http://www.w3.org/2000/svg">
+  <!--
+    FocusEngine splash screen: Session Dial motif (docs/V2_ADDENDUM.md A6, docs/DESIGN_SPEC.md §2).
+    Same ring construction as resources/icon.svg (60 ticks, rotation transforms, 6deg apart),
+    scaled down and centered on a full-bleed bg-token canvas per the M-spec ("splash = same
+    centered ring, smaller, on full #111013"). See scratchpad/gen_ticks.js for the generator
+    (splash params: cx=cy=1366, rOuter=300, tickLen=60, tickWidth=8).
+    Colors from DESIGN_SPEC.md §3 Theme "Studio": bg token #111013, work token #E2A33D.
+    Source image for the capacitor assets generator (android target); produces the
+    android splash plus dark variant. Note for editors: XML comments may not contain
+    two consecutive hyphens, so avoid the literal CSS token/flag spellings in here.
+  -->
+  <rect x="0" y="0" width="2732" height="2732" fill="#111013"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(0 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(6 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(12 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(18 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(24 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(30 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(36 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(42 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(48 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(54 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(60 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(66 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(72 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(78 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(84 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(90 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(96 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(102 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(108 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(114 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(120 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(126 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(132 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(138 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(144 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(150 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(156 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(162 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(168 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(174 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(180 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(186 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(192 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(198 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(204 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(210 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(216 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(222 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(228 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(234 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(240 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(246 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(252 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(258 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(264 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(270 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(276 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(282 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(288 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(294 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(300 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(306 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(312 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(318 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(324 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(330 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(336 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(342 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(348 1366 1366)"/>
+  <rect x="1362.00" y="1066.00" width="8" height="60" fill="#E2A33D" transform="rotate(354 1366 1366)"/>
+</svg>

@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Android/Gradle build outputs — never commit (generated, large, machine-specific).
+# Explicitly required by docs/V2_ADDENDUM.md A7: "android/app/build, .gradle".
+# Recursive so it also catches locally-rooted subproject build dirs, e.g.
+# android/capacitor-cordova-android-plugins/build/ (the capacitor-android,
+# capacitor-app, capacitor-browser, capacitor-haptics, and capacitor-status-bar
+# Gradle modules resolve straight from node_modules/@capacitor/* per
+# android/capacitor.settings.gradle, so node_modules/ below already covers them).
+android/**/build/
+android/.gradle/
+android/local.properties
+android/.idea/
+android/**/*.iml
+android/captures/
+
+# Capacitor
+.capacitor/

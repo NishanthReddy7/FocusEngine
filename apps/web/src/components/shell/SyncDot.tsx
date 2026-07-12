@@ -25,9 +25,11 @@ export function SyncDot() {
         setStatus("idle");
         setDetail("Up to date");
       }),
-      bus.on("sync.failed", (payload) => {
+      // Never surface the raw transport error (e.g. "Failed to fetch") — the
+      // engine keeps retrying, so say what happens next (Fix C, §9).
+      bus.on("sync.failed", () => {
         setStatus("failed");
-        setDetail(payload.reason ? `Sync failed — ${payload.reason}` : "Sync failed. Retry.");
+        setDetail("Sync will resume when the server wakes.");
       }),
     ];
     return () => {

@@ -1,22 +1,21 @@
 "use client";
 
 /**
- * Mobile sign-in handoff (A2). Google blocks OAuth inside a WebView, so the APK
- * opens THIS hosted page in the system browser; it runs GIS, exchanges the
- * Google credential for our JWT, then redirects to
+ * Mobile sign-in handoff (A2) + V2-G (Fixes A/C/D). Google blocks OAuth inside a
+ * WebView, so the APK opens THIS hosted page in the system browser; it runs GIS,
+ * exchanges the Google credential for our JWT, then redirects to
  * `focusengine://auth#token=<jwt>&user=<base64url(JSON)>` where the app's
  * deep-link listener captures it. A visible "Return to the app" link is the
- * fallback if the automatic scheme redirect is blocked. Fully static-export
- * safe — no server data, all work happens client-side in the browser.
+ * fallback if the automatic scheme redirect is blocked. Fully static-export safe.
+ *
+ * The exchange uses the same cold-start-resilient wake ladder as the web button
+ * (wake the sleeping Render backend, then exchange with retries), with the
+ * DESIGN_SPEC-styled button and working states — never a raw "Failed to fetch".
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  exchangeGoogleCredential,
-  GoogleAuthUnavailableError,
-  isGoogleConfigured,
-  renderGoogleButton,
-} from "@/lib/auth/google";
-import { useTheme } from "@/components/theme/ThemeProvider";
+import { GoogleAuthUnavailableError, isGoogleConfigured, primeGoogle, promptGoogle } from "@/lib/auth/google";
+import { WAKE_ERROR_MESSAGE, wakeAndExchange, type WakePhase } from "@/lib/auth/wake";
+import { GoogleBrandButton } from "@/components/auth/GoogleBrandButton";
 
 const DEEP_LINK = "focusengine://auth";
 
@@ -26,47 +25,62 @@ function base64Url(value: string): string {
   return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-type Phase = "ready" | "exchanging" | "done" | "error";
+type State =
+  | { kind: "idle" }
+  | { kind: "working"; phase: WakePhase }
+  | { kind: "done"; redirectUrl: string }
+  | { kind: "error"; message: string }
+  | { kind: "notice"; message: string };
 
 export default function MobileAuthPage() {
-  const { theme } = useTheme();
-  const buttonRef = useRef<HTMLDivElement>(null);
-  const [phase, setPhase] = useState<Phase>("ready");
-  const [error, setError] = useState<string | null>(null);
-  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
+  const [state, setState] = useState<State>({ kind: "idle" });
+  const runningRef = useRef(false);
 
-  const handleCredential = useCallback(async (credential: string) => {
-    setPhase("exchanging");
-    setError(null);
+  const runFlow = useCallback(async (credential: string) => {
+    if (runningRef.current) return;
+    runningRef.current = true;
+    setState({ kind: "working", phase: "connecting" });
     try {
-      const auth = await exchangeGoogleCredential(credential);
+      const auth = await wakeAndExchange(credential, {
+        onPhase: (phase) => setState({ kind: "working", phase }),
+      });
       const url = `${DEEP_LINK}#token=${auth.token}&user=${base64Url(JSON.stringify(auth.user))}`;
-      setRedirectUrl(url);
-      setPhase("done");
+      setState({ kind: "done", redirectUrl: url });
       window.location.href = url; // hand the session to the native app
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign-in failed. Try again.");
-      setPhase("error");
+      if (err instanceof GoogleAuthUnavailableError) {
+        setState({ kind: "notice", message: err.message });
+      } else {
+        setState({ kind: "error", message: WAKE_ERROR_MESSAGE });
+      }
+    } finally {
+      runningRef.current = false;
     }
   }, []);
 
   useEffect(() => {
-    const container = buttonRef.current;
-    if (!isGoogleConfigured || !container) return;
+    if (!isGoogleConfigured) return;
     let cancelled = false;
-    void renderGoogleButton(container, (credential) => void handleCredential(credential), theme).catch((err) => {
-      if (cancelled) return;
-      setError(
-        err instanceof GoogleAuthUnavailableError || err instanceof Error
-          ? err.message
-          : "Sign-in is unavailable right now.",
-      );
-      setPhase("error");
+    void primeGoogle((credential) => {
+      if (!cancelled) void runFlow(credential);
+    }).catch(() => {
+      if (!cancelled) {
+        setState({ kind: "notice", message: "Google sign-in is unavailable right now. Open the app to keep working locally." });
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [handleCredential, theme]);
+  }, [runFlow]);
+
+  const beginSignIn = useCallback(() => {
+    setState({ kind: "working", phase: "connecting" });
+    promptGoogle(() => {
+      if (!runningRef.current) setState({ kind: "idle" });
+    });
+  }, []);
+
+  const working = state.kind === "working";
 
   return (
     <main
@@ -78,37 +92,38 @@ export default function MobileAuthPage() {
         <h1 className="font-display text-title text-ink">Sign in on your phone</h1>
 
         {!isGoogleConfigured ? (
-          <p className="text-secondary text-muted">
-            Sign-in is not configured. Open the app to keep working locally.
-          </p>
-        ) : (
-          <>
-            <p className="text-secondary text-muted">Continue with Google to sync this device.</p>
-            <div
-              ref={buttonRef}
-              aria-label="Sign in with Google"
-              className={phase === "exchanging" ? "pointer-events-none opacity-50" : ""}
-            />
-          </>
-        )}
-
-        {phase === "exchanging" && (
-          <p className="font-mono text-meta uppercase tracking-[0.14em] text-muted">Signing in</p>
-        )}
-
-        {phase === "done" && redirectUrl && (
+          <p className="text-secondary text-muted">Sign-in is not configured. Open the app to keep working locally.</p>
+        ) : state.kind === "done" ? (
           <div className="flex flex-col items-center gap-2">
             <p className="text-secondary text-break">Signed in. Returning to the app.</p>
-            <a href={redirectUrl} className="text-secondary text-work transition-colors hover:underline">
+            <a href={state.redirectUrl} className="text-secondary text-work transition-colors hover:underline">
               Return to the app
             </a>
           </div>
-        )}
+        ) : (
+          <div className="flex w-full flex-col gap-3">
+            <p className="text-secondary text-muted">Continue with Google to sync this device.</p>
+            <GoogleBrandButton onClick={beginSignIn} working={working} phase={working ? state.phase : "connecting"} />
 
-        {phase === "error" && error && (
-          <p role="status" className="text-secondary text-overdue">
-            {error}
-          </p>
+            {state.kind === "error" && (
+              <div role="alert" className="flex flex-col items-center gap-2">
+                <p className="text-secondary text-muted">{state.message}</p>
+                <button
+                  type="button"
+                  onClick={beginSignIn}
+                  className="rounded-md border border-hairline px-3 py-1.5 text-secondary text-work transition-colors duration-150 hover:bg-surface-2"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {state.kind === "notice" && (
+              <p role="status" className="text-secondary text-muted">
+                {state.message}
+              </p>
+            )}
+          </div>
         )}
       </div>
     </main>

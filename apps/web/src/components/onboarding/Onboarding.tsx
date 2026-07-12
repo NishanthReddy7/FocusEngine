@@ -1,15 +1,18 @@
 "use client";
 
 /**
- * First-launch onboarding — A6: three screens (welcome/thesis · theme pick with
- * a live Studio/Neon preview · defaults: preset + week start + display name).
- * Writes `_meta.settings` (and `PATCH /me/settings` when signed in) on finish,
- * and applies the chosen theme through the ThemeProvider. Tokens/typography/
- * voice are DESIGN_SPEC-verbatim; no exclamation marks (§9).
+ * First-launch onboarding — A6 + V2-G (Fix E): four screens (welcome/thesis ·
+ * theme pick with a live Studio/Neon preview · defaults: preset + week start +
+ * display name · sync: sign in to sync across devices, or skip). Writes
+ * `_meta.settings` (and `PATCH /me/settings` when signed in) on finish, and
+ * applies the chosen theme through the ThemeProvider. Tokens/typography/voice
+ * are DESIGN_SPEC-verbatim; no exclamation marks (§9).
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FocusPreset, PRESET_DURATIONS } from "@focusengine/schemas/enums";
 import { useTheme, type Theme } from "@/components/theme/ThemeProvider";
+import { useAuth } from "@/lib/auth/provider";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from "@/lib/settings";
 
 const PRESETS: readonly FocusPreset[] = [FocusPreset.SPRINT, FocusPreset.FOCUS, FocusPreset.FLOW, FocusPreset.DEEP_WORK];
@@ -25,7 +28,7 @@ function presetLabel(preset: FocusPreset): string {
   return `${d.work_minutes}/${d.break_minutes}`;
 }
 
-const TOTAL_STEPS = 3;
+const TOTAL_STEPS = 4;
 
 /** A small echo of the Session Dial (§2) — a 30-tick ring with a lit arc — used
  *  purely as a themed preview swatch. Reads the surrounding theme tokens, so the
@@ -89,12 +92,14 @@ function ThemePreview({ theme, selected, onSelect }: { theme: Theme; selected: b
 
 export function Onboarding({ onDone }: { onDone: () => void }) {
   const { setTheme } = useTheme();
+  const { status } = useAuth();
   const [step, setStep] = useState(0);
   const [themeChoice, setThemeChoice] = useState<Theme>(DEFAULT_SETTINGS.theme);
   const [preset, setPreset] = useState<FocusPreset>(DEFAULT_SETTINGS.default_preset);
   const [weekStart, setWeekStart] = useState<0 | 1>(DEFAULT_SETTINGS.week_start);
   const [displayName, setDisplayName] = useState(DEFAULT_SETTINGS.display_name);
   const [saving, setSaving] = useState(false);
+  const finishedRef = useRef(false);
 
   // Seed from any settings already stored (re-running onboarding keeps picks).
   useEffect(() => {
@@ -111,7 +116,12 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     setTheme(next); // live: recolors the whole app behind the overlay
   }
 
+  // Persist the onboarding picks and close. Guarded so signing in AND clicking
+  // "Skip for now" can't both fire it (Fix E). Runs after any sign-in has
+  // already activated the session, so these picks win locally and push up.
   async function finish() {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
     setSaving(true);
     await saveSettings({
       theme: themeChoice,
@@ -123,6 +133,12 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     setTheme(themeChoice);
     onDone();
   }
+
+  // Fix E: completing sign-in on the sync step finishes onboarding into the app.
+  useEffect(() => {
+    if (step === TOTAL_STEPS - 1 && status === "authed") void finish();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, status]);
 
   const segmented = "flex divide-x divide-hairline overflow-hidden rounded-lg border border-hairline";
 
@@ -243,6 +259,27 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           </div>
         )}
 
+        {step === 3 && (
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-2">
+              <p className="eyebrow">Sync</p>
+              <h1 className="font-display text-title text-ink">Sign in to sync</h1>
+              <p className="text-secondary text-muted">
+                Sign in to sync your tasks and history across devices. Your data stays on this device until you do.
+              </p>
+            </div>
+            <GoogleSignInButton />
+            <button
+              type="button"
+              onClick={() => void finish()}
+              disabled={saving}
+              className="self-start rounded-md px-1 py-1 text-secondary text-muted transition-colors duration-150 hover:text-ink disabled:cursor-not-allowed"
+            >
+              {saving ? "Saving" : "Skip for now"}
+            </button>
+          </div>
+        )}
+
         {/* Navigation */}
         <div className="mt-2 flex items-center justify-between">
           <button
@@ -253,22 +290,15 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           >
             Back
           </button>
-          {step < TOTAL_STEPS - 1 ? (
+          {/* The sync step (last) proceeds via sign-in or "Skip for now", so no
+              Continue/Start here — only Back. */}
+          {step < TOTAL_STEPS - 1 && (
             <button
               type="button"
               onClick={() => setStep((s) => Math.min(TOTAL_STEPS - 1, s + 1))}
               className="rounded-md border border-hairline px-5 py-2 text-secondary text-work transition-colors duration-150 hover:bg-surface"
             >
               Continue
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => void finish()}
-              disabled={saving}
-              className="rounded-md border border-hairline px-5 py-2 text-secondary text-work transition-colors duration-150 hover:bg-surface disabled:cursor-not-allowed disabled:text-muted"
-            >
-              {saving ? "Saving" : "Start"}
             </button>
           )}
         </div>

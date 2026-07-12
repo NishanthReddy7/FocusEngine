@@ -186,6 +186,18 @@ body {
   animation: chip-in 150ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Sign-in working spinner (§6 loading / §7 restraint) — a slow linear spin on
+ * the hairline ring + work-color arc in the Google button's working state. */
+@keyframes fe-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.fe-spin {
+  animation: fe-spin 0.8s linear infinite;
+  transform-origin: center;
+}
+
 /* Sync dot pulse while syncing (§6). */
 @keyframes sync-pulse {
   0%,

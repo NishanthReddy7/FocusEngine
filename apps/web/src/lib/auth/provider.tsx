@@ -26,7 +26,8 @@ import {
 } from "@/lib/db/repository";
 import { authHeader, setAuthToken } from "@/lib/auth/token";
 import { claimLocalData } from "@/lib/auth/claim";
-import { exchangeGoogleCredential, GoogleAuthUnavailableError, isGoogleConfigured } from "@/lib/auth/google";
+import { GoogleAuthUnavailableError, isGoogleConfigured } from "@/lib/auth/google";
+import { prewarmApi, SignInWakeError, wakeAndExchange, type WakePhase } from "@/lib/auth/wake";
 import { applyServerSettings } from "@/lib/settings";
 import { bus } from "@/lib/events/bus";
 
@@ -50,9 +51,13 @@ interface AuthContextValue {
    *  a failure). Cleared with {@link clearMessage}. */
   message: string | null;
   /** Feed the Google ID token from a GIS credential callback (button or the
-   *  `/auth/mobile` page). Resolves once the session is settled (or a
-   *  "Replace local data?" prompt is pending). */
-  signInWithCredential: (googleIdToken: string) => Promise<void>;
+   *  `/auth/mobile` page). Runs the cold-start-resilient wake + exchange flow
+   *  (`onPhase` reports "connecting" → "waking" so the button copy tracks it).
+   *  Resolves once the session is settled (or a "Replace local data?" prompt is
+   *  pending); REJECTS with a {@link GoogleAuthUnavailableError} (server has no
+   *  Google client → local-only) or a designed sign-in failure the caller
+   *  surfaces inline — never a raw fetch error. */
+  signInWithCredential: (googleIdToken: string, opts?: { onPhase?: (phase: WakePhase) => void }) => Promise<void>;
   signOut: () => Promise<void>;
   clearMessage: () => void;
   /** Non-null while a different-user sign-in awaits the wipe/cancel decision. */
@@ -97,6 +102,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Restore a cached session on load, best-effort refreshing it from GET /me.
   useEffect(() => {
     let active = true;
+    // Fix B — app-load pre-warm: wake Render (once, silently) while the user
+    // works locally, so sign-in and sync are warm by the time they're used.
+    prewarmApi();
     void (async () => {
       const stored = await getStoredAuth();
       if (!active) return;
@@ -142,20 +150,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signInWithCredential = useCallback(
-    async (googleIdToken: string) => {
+    async (googleIdToken: string, opts?: { onPhase?: (phase: WakePhase) => void }) => {
       setMessage(null);
       let auth: AuthResponse;
       try {
-        auth = await exchangeGoogleCredential(googleIdToken);
+        // Fix A — wake the sleeping backend first, THEN exchange the credential.
+        auth = await wakeAndExchange(googleIdToken, { onPhase: opts?.onPhase });
       } catch (err) {
         if (err instanceof GoogleAuthUnavailableError) {
-          // Server has no Google client (503) — stay local-only, explain why.
+          // Server has no Google client (503) — stay local-only; the caller
+          // renders the explanation inline (no floating toast).
           setStatus("local-only");
-          setMessage(err.message);
-          return;
+          throw err;
         }
-        setMessage(err instanceof Error ? err.message : "Sign-in failed. Try again.");
-        return;
+        // Never surface a raw fetch error ("Failed to fetch"): normalise every
+        // other failure to the designed wake message for the caller to show
+        // inline under the button, with a Retry (Fix A/C, §9).
+        throw err instanceof SignInWakeError ? err : new SignInWakeError();
       }
 
       const owner = await getDataOwner();

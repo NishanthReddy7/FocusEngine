@@ -36,8 +36,7 @@ focusengine/
 ├── docs/
 │   ├── ARCHITECTURE.md              # ← this file (binding contracts)
 │   ├── SYNC_STRATEGY.md             # Deliverable 4: local-first sync blueprint
-│   └── superpowers/plans/
-│       └── 2026-07-12-focusengine-core.md   # implementation plan (T1–T5)
+│   └── V2_ADDENDUM.md              # v2 scope: auth, sync-everywhere, mobile, deploy
 ├── packages/
 │   └── schemas/                     # shared contract types (TS mirror of §4)
 │       ├── package.json

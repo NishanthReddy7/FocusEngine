@@ -1,0 +1,24 @@
+{
+  "name": "focusengine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FocusEngine — local-first task capture (Todoist core) + deep-work execution (Superfocus core) over one shared, synced data model.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=18.18.0",
+    "pnpm": ">=8.15.0"
+  },
+  "packageManager": "pnpm@8.15.4",
+  "//workspaces": "npm-compatible workspace list (pnpm reads pnpm-workspace.yaml). Added by T7 because pnpm is unavailable on this machine; npm needs this field to link the local @focusengine/schemas package. apps/api is Python (no package.json) and intentionally excluded.",
+  "workspaces": [
+    "apps/web",
+    "apps/mobile",
+    "packages/schemas"
+  ],
+  "scripts": {
+    "dev": "pnpm --filter @focusengine/web dev",
+    "build": "pnpm --filter @focusengine/web build",
+    "start": "pnpm --filter @focusengine/web start",
+    "lint": "pnpm --filter @focusengine/web lint"
+  }
+}

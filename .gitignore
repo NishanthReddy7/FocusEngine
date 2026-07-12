@@ -1,0 +1,38 @@
+# Node / pnpm
+node_modules/
+.pnpm-store/
+.next/
+out/
+dist/
+*.tsbuildinfo
+npm-debug.log*
+pnpm-debug.log*
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Internal planning/process docs — not published (project docs only; see
+# docs/ARCHITECTURE.md, SYNC_STRATEGY.md, DESIGN_SPEC.md for the public specs)
+docs/superpowers/
+docs/HANDOFF.md
+docs/V2_ADDENDUM.md

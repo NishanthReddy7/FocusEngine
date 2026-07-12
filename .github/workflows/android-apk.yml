@@ -1,0 +1,113 @@
+name: Build Android debug APK
+
+# Builds the mobile-flavored (NEXT_PUBLIC_PLATFORM=mobile) static export of
+# apps/web, syncs it into the Capacitor Android project (apps/mobile/android),
+# and produces a debug APK. See docs/V2_ADDENDUM.md A4/A6. This APK is
+# unsigned/debug-only by design (no release signing configured — the v2 plan
+# explicitly scopes this to a debug APK; see apps/mobile/README.md), installed
+# by the user via "allow install unknown apps" per A8's checklist.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "apps/mobile/**"
+      - "apps/web/**"
+
+permissions:
+  contents: write # softprops/action-gh-release needs this to create/update the rolling release
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      # Capacitor 8's Android library module (:capacitor-android) compiles
+      # with a Java 21 source/target release. A local build attempt during
+      # development (this task) confirmed JDK 17 fails here with
+      # "error: invalid source release: 21"; JDK 21 built successfully
+      # end-to-end (BUILD SUCCESSFUL, debug APK produced). A4 explicitly
+      # allows either 17 or 21 for the local path — 21 is the one that
+      # actually works against the plugin versions npm installed.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      # ubuntu-latest (24.04) ships a preinstalled Android SDK with ANDROID_HOME
+      # set and, per actions/runner-images' published manifest, platform
+      # android-36 plus compatible build-tools already present — exactly what
+      # apps/mobile/android/variables.gradle asks for (compileSdk/targetSdk 36).
+      # No explicit sdkmanager/setup-android step should be needed; if a future
+      # runner-image revision drops that platform, this is the first place to
+      # add one back (with the exact error from the failed run).
+      - name: Install dependencies
+        run: npm ci
+
+      # Mobile flavor: NEXT_PUBLIC_PLATFORM switches the UI to the bottom-tab
+      # layout (A6). NEXT_PUBLIC_BASE_PATH is deliberately NOT set here (unlike
+      # pages.yml) — the mobile bundle is served from the Capacitor WebView's
+      # own local root (capacitor.config.ts: server.androidScheme "https", no
+      # subpath), not from a github.io subdirectory; a "/FocusEngine" base path
+      # would break every asset URL in the packaged app. If the web
+      # workstream's basePath-gating logic changes shape, re-check this.
+      - name: Build web (mobile static export)
+        env:
+          NEXT_OUTPUT: export
+          NEXT_PUBLIC_PLATFORM: mobile
+          NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
+        run: npm run build --workspace=apps/web
+
+      # capacitor.config.ts's webDir check now finds the real apps/web/out
+      # (just built above) instead of the out-placeholder fallback.
+      - name: Sync Capacitor Android project
+        working-directory: apps/mobile
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Rename APK
+        run: cp apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk focusengine-debug.apk
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: focusengine-debug.apk
+          path: focusengine-debug.apk
+          retention-days: 30
+
+      # Rolling release: re-running this workflow (new push, or manual
+      # dispatch) updates the SAME "latest-apk" tag/release rather than
+      # creating a new one each time. overwrite_files defaults to true in
+      # softprops/action-gh-release@v3, so a same-named asset from a prior
+      # run is replaced cleanly on re-run; set explicitly here for clarity.
+      - name: Publish to rolling latest-apk release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: latest-apk
+          name: FocusEngine (latest debug build)
+          body: |
+            Automatically rebuilt debug APK from the latest main branch build of this workflow.
+            Commit: ${{ github.sha }}
+            Debug build, not signed for release. Install requires enabling "install unknown apps" for your browser/file manager (see apps/mobile/README.md).
+          files: focusengine-debug.apk
+          overwrite_files: true
+          make_latest: true

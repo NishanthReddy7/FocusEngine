@@ -1,0 +1,11 @@
+{
+  "name": "@focusengine/schemas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared snake_case wire contract (TS mirror of docs/ARCHITECTURE.md §4). Consumed via TS path aliases, not a build step.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "ts/entities.ts",
+  "types": "ts/entities.ts",
+  "sideEffects": false
+}

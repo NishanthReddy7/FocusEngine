@@ -2,13 +2,13 @@
 # Keeps the free-tier API instance warm during waking hours so sign-in and
 # sync respond instantly. Render free tier sleeps after ~15 idle minutes and
 # takes 30-90s to wake; a ping every 10 minutes prevents that entirely.
-# Hours are limited (03:00-18:59 UTC ≈ 08:30-00:30 IST) to conserve the
+# Hours are limited (03:00-17:59 UTC ≈ 08:30-23:30 IST) to conserve the
 # account's free instance-hours for other services. Adjust or delete freely.
 name: Keep API warm
 
 on:
   schedule:
-    - cron: "*/10 3-18 * * *"
+    - cron: "*/10 3-17 * * *"
   workflow_dispatch:
 
 jobs:

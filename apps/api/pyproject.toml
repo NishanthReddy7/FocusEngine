@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "FocusEngine backend — FastAPI + Pydantic v2 + SQLAlchemy 2.0 (async/SQLite)."
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi",
+    "fastapi>=0.139.0,<0.140.0",
     "uvicorn[standard]",
     "pydantic>=2.7",
     "pydantic-settings",

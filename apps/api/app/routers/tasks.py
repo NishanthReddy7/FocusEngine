@@ -96,7 +96,7 @@ async def patch_task(
     return updated
 
 
-@router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{task_id}", response_model=None, status_code=status.HTTP_204_NO_CONTENT)
 async def delete_task(
     task_id: UUID, session: DbSession, current_user: CurrentUser, hlc_clock: HlcClock, notifier: Notifier
 ) -> None:

@@ -1,0 +1,20 @@
+
+# Keeps the free-tier API instance warm during waking hours so sign-in and
+# sync respond instantly. Render free tier sleeps after ~15 idle minutes and
+# takes 30-90s to wake; a ping every 10 minutes prevents that entirely.
+# Hours are limited (03:00-18:59 UTC ≈ 08:30-00:30 IST) to conserve the
+# account's free instance-hours for other services. Adjust or delete freely.
+name: Keep API warm
+
+on:
+  schedule:
+    - cron: "*/10 3-18 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping health endpoint
+        run: curl -fsS --max-time 120 https://focusengine-api.onrender.com/health || true

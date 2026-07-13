@@ -6,6 +6,11 @@
  * row (due — overdue in the overdue hue —, labels, an energy glyph, accumulated
  * focus time). Hovering washes the row in `--surface` and reveals a Play button
  * that starts a focus session on this task: the capture → focus bridge.
+ *
+ * Editing (V2-H Fix 3): clicking the title, or the ⋯ menu's "Edit task", opens
+ * the full editor — inline below the row on desktop, a bottom sheet on the mobile
+ * flavor (A6). The ⋯ menu also carries the existing "End recurrence" action for
+ * recurring tasks.
  */
 import { useState } from "react";
 import { Check, MoreHorizontal, Play } from "lucide-react";
@@ -16,6 +21,7 @@ import { completeTask, updateEntity } from "@/lib/db/repository";
 import { setPendingFocusTask } from "@/lib/focus/handoff";
 import { isMobileFlavor } from "@/lib/platform";
 import { todayISO } from "./scope";
+import { TaskEditorFields, TaskEditSheet } from "./TaskEditor";
 
 // Mobile flavor (A6): row affordances are never hover-gated — the Play + ⋯
 // buttons are always visible and ≥44px. Web flavor keeps the quiet hover reveal.
@@ -63,6 +69,7 @@ function formatFocus(seconds: number): string | null {
 export function TaskRow({ task }: { task: Task }) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const completed = task.status === TaskStatus.COMPLETED;
   const priorityColor = `var(--p${task.priority})`;
   const showPriorityRing = task.priority !== Priority.P4; // P4 is the quiet default
@@ -76,62 +83,72 @@ export function TaskRow({ task }: { task: Task }) {
     router.push("/focus");
   }
 
+  const showInlineEditor = editing && !isMobileFlavor;
+
   return (
-    <li className="group flex items-center gap-3 rounded-md px-2 py-2 transition-colors duration-150 hover:bg-surface">
-      <button
-        type="button"
-        onClick={() => !completed && void completeTask(task.id)}
-        aria-label={completed ? "Completed" : "Complete task"}
-        aria-pressed={completed}
-        className="relative flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 transition-colors duration-200"
-        style={{
-          borderColor: showPriorityRing ? priorityColor : "var(--text-muted)",
-          backgroundColor: completed ? priorityColor : "transparent",
-        }}
-      >
-        {completed ? (
-          <Check size={11} strokeWidth={3} style={{ color: "var(--bg)" }} />
-        ) : (
-          <span
-            aria-hidden
-            className="h-2 w-2 scale-0 rounded-full transition-transform duration-200 group-hover:scale-100"
-            style={{ backgroundColor: "var(--work)" }}
-          />
-        )}
-      </button>
-
-      <div className="min-w-0 flex-1">
-        <p className={`truncate text-body ${completed ? "text-muted line-through" : "text-ink"}`}>{task.title}</p>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 font-mono text-[11px] text-muted">
-          {task.due && (
-            <span style={isOverdue ? { color: "var(--overdue)" } : undefined}>
-              {formatDueDate(task.due.date)}
-              {task.due.time ? ` ${task.due.time}` : ""}
-            </span>
-          )}
-          <span aria-label={`Energy ${task.energy_required}`} style={{ color: ENERGY_COLOR[task.energy_required] }}>
-            {ENERGY_GLYPH[task.energy_required]}
-          </span>
-          {task.labels.map((label) => (
-            <span key={label}>#{label}</span>
-          ))}
-          {focusLabel && <span className="text-muted">{focusLabel}</span>}
-        </div>
-      </div>
-
-      {!completed && (
+    <li className="group rounded-md transition-colors duration-150 hover:bg-surface">
+      <div className="flex items-center gap-3 px-2 py-2">
         <button
           type="button"
-          onClick={toFocus}
-          aria-label={`Focus on ${task.title}`}
-          title="Start a focus session"
-          className={`${ACTION_BTN} text-muted hover:text-work`}
+          onClick={() => !completed && void completeTask(task.id)}
+          aria-label={completed ? "Completed" : "Complete task"}
+          aria-pressed={completed}
+          className="relative flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 transition-colors duration-200"
+          style={{
+            borderColor: showPriorityRing ? priorityColor : "var(--text-muted)",
+            backgroundColor: completed ? priorityColor : "transparent",
+          }}
         >
-          <Play size={15} strokeWidth={1.75} />
+          {completed ? (
+            <Check size={11} strokeWidth={3} style={{ color: "var(--bg)" }} />
+          ) : (
+            <span
+              aria-hidden
+              className="h-2 w-2 scale-0 rounded-full transition-transform duration-200 group-hover:scale-100"
+              style={{ backgroundColor: "var(--work)" }}
+            />
+          )}
         </button>
-      )}
 
-      {isRecurring && (
+        <div className="min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={() => setEditing((e) => !e)}
+            aria-expanded={showInlineEditor}
+            title="Edit task"
+            className={`block w-full truncate text-left text-body ${completed ? "text-muted line-through" : "text-ink"}`}
+          >
+            {task.title}
+          </button>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 font-mono text-[11px] text-muted">
+            {task.due && (
+              <span style={isOverdue ? { color: "var(--overdue)" } : undefined}>
+                {formatDueDate(task.due.date)}
+                {task.due.time ? ` ${task.due.time}` : ""}
+              </span>
+            )}
+            <span aria-label={`Energy ${task.energy_required}`} style={{ color: ENERGY_COLOR[task.energy_required] }}>
+              {ENERGY_GLYPH[task.energy_required]}
+            </span>
+            {task.labels.map((label) => (
+              <span key={label}>#{label}</span>
+            ))}
+            {focusLabel && <span className="text-muted">{focusLabel}</span>}
+          </div>
+        </div>
+
+        {!completed && (
+          <button
+            type="button"
+            onClick={toFocus}
+            aria-label={`Focus on ${task.title}`}
+            title="Start a focus session"
+            className={`${ACTION_BTN} text-muted hover:text-work`}
+          >
+            <Play size={15} strokeWidth={1.75} />
+          </button>
+        )}
+
         <div className="relative shrink-0">
           <button
             type="button"
@@ -157,18 +174,38 @@ export function TaskRow({ task }: { task: Task }) {
                 <button
                   type="button"
                   onClick={() => {
-                    endRecurrence(task);
+                    setEditing(true);
                     setMenuOpen(false);
                   }}
                   className="block w-full px-3 py-1.5 text-left text-secondary text-muted transition-colors hover:bg-surface hover:text-ink"
                 >
-                  End recurrence
+                  Edit task
                 </button>
+                {isRecurring && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      endRecurrence(task);
+                      setMenuOpen(false);
+                    }}
+                    className="block w-full px-3 py-1.5 text-left text-secondary text-muted transition-colors hover:bg-surface hover:text-ink"
+                  >
+                    End recurrence
+                  </button>
+                )}
               </div>
             </>
           )}
         </div>
+      </div>
+
+      {showInlineEditor && (
+        <div className="border-t border-hairline px-2 pb-3 pt-3">
+          <TaskEditorFields task={task} onClose={() => setEditing(false)} />
+        </div>
       )}
+
+      {editing && isMobileFlavor && <TaskEditSheet task={task} onClose={() => setEditing(false)} />}
     </li>
   );
 }

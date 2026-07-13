@@ -12,6 +12,7 @@ import { AmbientTrack, FocusPreset, PRESET_DURATIONS, SessionState } from "@focu
 import type { UseFocusTimerResult } from "@/hooks/useFocusTimer";
 import { ambientAudioEngine } from "@/lib/audio/engine";
 import { isMobileFlavor } from "@/lib/platform";
+import { loadSettings } from "@/lib/settings";
 import { SessionDial } from "./SessionDial";
 
 const PRESETS: readonly FocusPreset[] = [FocusPreset.SPRINT, FocusPreset.FOCUS, FocusPreset.FLOW, FocusPreset.DEEP_WORK];
@@ -51,6 +52,27 @@ export function TimerHUD({ taskId, taskTitle, timer }: TimerHUDProps) {
   const [preset, setPreset] = useState<FocusPreset>(FocusPreset.FOCUS);
   const [track, setTrack] = useState<AmbientTrack>(AmbientTrack.NONE);
 
+  // Space-to-start and the idle picker default to the user's saved preset (A6
+  // onboarding / settings), not a hard-coded FOCUS. Applied once on mount.
+  useEffect(() => {
+    let active = true;
+    void loadSettings().then((s) => {
+      if (active) setPreset(s.default_preset);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // The AudioContext can only be created/resumed from a user gesture; the Start
+  // click (and Space keydown) is that gesture, so we unlock audio here before
+  // the async session-start fires the `focus.session.started` bus event.
+  function beginSession() {
+    if (!taskId) return;
+    ambientAudioEngine.resume();
+    void start(taskId, preset);
+  }
+
   const state = session?.state ?? SessionState.IDLE;
   const isActive = state === SessionState.ACTIVE_WORK;
   const isPaused = state === SessionState.PAUSED;
@@ -78,7 +100,10 @@ export function TimerHUD({ taskId, taskTitle, timer }: TimerHUDProps) {
       event.preventDefault();
       if (isActive) void pause();
       else if (isPaused) void resume();
-      else if (!isRunning && taskId) void start(taskId, preset);
+      else if (!isRunning && taskId) {
+        ambientAudioEngine.resume();
+        void start(taskId, preset);
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -132,7 +157,7 @@ export function TimerHUD({ taskId, taskTitle, timer }: TimerHUDProps) {
         <button
           type="button"
           disabled={!taskId}
-          onClick={() => taskId && void start(taskId, preset)}
+          onClick={beginSession}
           className="rounded-md px-4 py-2 text-secondary text-work transition-colors duration-150 hover:bg-surface disabled:cursor-not-allowed disabled:text-muted"
         >
           Start session
@@ -170,6 +195,13 @@ export function TimerHUD({ taskId, taskTitle, timer }: TimerHUDProps) {
     </p>
   ) : null;
 
+  // §10 keyboard hint — documents the Space shortcut right where it acts.
+  const spaceHint = (
+    <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
+      {isRunning ? "Space · pause / resume" : "Space · start"}
+    </p>
+  );
+
   // Ambient (bottom-left) + shield status (bottom-right) readouts (§5) — desktop
   // only; the mobile hero keeps the cockpit clean.
   const readouts = (
@@ -182,6 +214,11 @@ export function TimerHUD({ taskId, taskTitle, timer }: TimerHUDProps) {
       >
         Audio · {ambientLabel(track)}
       </button>
+      {track === AmbientTrack.BINAURAL && (
+        <p className="fixed bottom-11 left-5 hidden font-mono text-[10px] tracking-[0.1em] text-muted md:block">
+          binaural needs headphones
+        </p>
+      )}
       <p
         className="fixed bottom-5 right-5 hidden font-mono text-[11px] uppercase tracking-[0.14em] md:block"
         style={{ color: isActive ? "var(--work)" : "var(--text-muted)" }}
@@ -219,6 +256,7 @@ export function TimerHUD({ taskId, taskTitle, timer }: TimerHUDProps) {
         <div className="flex w-full flex-col items-center gap-5">
           {presetPicker}
           {controlRow}
+          {spaceHint}
           {errorNote}
         </div>
         {readouts}
@@ -231,6 +269,7 @@ export function TimerHUD({ taskId, taskTitle, timer }: TimerHUDProps) {
       {dial}
       {presetPicker}
       {controlRow}
+      {spaceHint}
       {errorNote}
       {readouts}
     </div>

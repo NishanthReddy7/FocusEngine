@@ -14,6 +14,7 @@ import type { Task } from "@focusengine/schemas/entities";
 import { useLiveQuery } from "@/hooks/useLiveQuery";
 import { completeTask, updateEntity } from "@/lib/db/repository";
 import { matchesScope, type Scope } from "./scope";
+import { TaskEditSheet } from "./TaskEditor";
 
 const COLUMNS: ReadonlyArray<{ status: TaskStatus; label: string }> = [
   { status: TaskStatus.PENDING, label: "Pending" },
@@ -37,14 +38,22 @@ function moveTask(task: Task, target: TaskStatus): void {
 
 function BoardCard({ task }: { task: Task }) {
   const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const targets = COLUMNS.map((c) => c.status).filter((s) => s !== task.status);
 
   return (
     <li className="relative rounded-lg border border-hairline bg-surface px-3 py-2.5">
       <div className="flex items-start justify-between gap-2">
-        <p className={`text-secondary ${task.status === TaskStatus.COMPLETED ? "text-muted line-through" : "text-ink"}`}>
+        <button
+          type="button"
+          onClick={() => setEditOpen(true)}
+          title="Edit task"
+          className={`flex-1 text-left text-secondary ${
+            task.status === TaskStatus.COMPLETED ? "text-muted line-through" : "text-ink"
+          }`}
+        >
           {task.title}
-        </p>
+        </button>
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
@@ -75,6 +84,16 @@ function BoardCard({ task }: { task: Task }) {
             className="fixed inset-0 z-10 cursor-default"
           />
           <div className="absolute right-2 top-9 z-20 min-w-40 overflow-hidden rounded-md border border-hairline bg-surface-2 py-1">
+            <button
+              type="button"
+              onClick={() => {
+                setEditOpen(true);
+                setOpen(false);
+              }}
+              className="block w-full px-3 py-1.5 text-left text-secondary text-muted transition-colors hover:bg-surface hover:text-ink"
+            >
+              Edit task
+            </button>
             {targets.map((target) => (
               <button
                 key={target}
@@ -91,6 +110,8 @@ function BoardCard({ task }: { task: Task }) {
           </div>
         </>
       )}
+
+      {editOpen && <TaskEditSheet task={task} onClose={() => setEditOpen(false)} />}
     </li>
   );
 }

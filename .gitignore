@@ -35,3 +35,4 @@ __pycache__/
 # docs/ARCHITECTURE.md, SYNC_STRATEGY.md, DESIGN_SPEC.md for the public specs)
 docs/superpowers/
 docs/HANDOFF.md
+docs/handoff/

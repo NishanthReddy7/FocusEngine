@@ -5,10 +5,12 @@
  * 07–22, an all-day row on top, timed tasks as blocks tinted by priority at 12%
  * alpha, and a `--work` hairline highlight on today's column.
  */
+import { useState } from "react";
 import type { Task } from "@focusengine/schemas/entities";
 import { useLiveQuery } from "@/hooks/useLiveQuery";
 import { addDays, isoWeekdayOf } from "@/lib/recurrence/next";
 import { todayISO, type Scope } from "./scope";
+import { TaskEditSheet } from "./TaskEditor";
 
 const WEEKDAY_ABBR = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 const HOURS = Array.from({ length: 16 }, (_, i) => i + 7); // 07:00 – 22:00
@@ -23,19 +25,25 @@ function hourOf(time: string): number {
 }
 
 function TaskBlock({ task }: { task: Task }) {
+  const [editOpen, setEditOpen] = useState(false);
   const color = `var(--p${task.priority})`;
   return (
-    <div
-      className="truncate rounded-[4px] px-1.5 py-1 text-[11px] leading-tight text-ink"
-      style={{
-        backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`,
-        borderLeft: `2px solid ${color}`,
-      }}
-      title={task.title}
-    >
-      {task.due?.time && <span className="font-mono text-muted">{task.due.time} </span>}
-      {task.title}
-    </div>
+    <>
+      <button
+        type="button"
+        onClick={() => setEditOpen(true)}
+        className="block w-full truncate rounded-[4px] px-1.5 py-1 text-left text-[11px] leading-tight text-ink"
+        style={{
+          backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`,
+          borderLeft: `2px solid ${color}`,
+        }}
+        title={`Edit ${task.title}`}
+      >
+        {task.due?.time && <span className="font-mono text-muted">{task.due.time} </span>}
+        {task.title}
+      </button>
+      {editOpen && <TaskEditSheet task={task} onClose={() => setEditOpen(false)} />}
+    </>
   );
 }
 

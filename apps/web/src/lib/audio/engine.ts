@@ -3,52 +3,174 @@
  * events (never imports timer/focus-controller internals — that's the whole
  * point of the event-bus integration, ARCHITECTURE.md §1 principle 3).
  *
- * Audio assets are NOT shipped with this scaffold (ARCHITECTURE.md §2,
- * "Not included by design"); wire real files at `public/audio/<track>.mp3`
- * for this to be audible.
+ * No audio asset files were ever shipped (ARCHITECTURE.md §2, "Not included by
+ * design"), so this synthesizes every track with the Web Audio API instead of
+ * streaming `.mp3`s — the live site was silent otherwise. The public surface is
+ * unchanged (`setTrack`, `fadeTo`, `destroy`, the singleton) and the §7.5
+ * volume rules are honoured, but now through a master `GainNode`:
+ *   - `focus.session.started|resumed` → gain 1.0
+ *   - `focus.break.started`           → fade to 0.5
+ *   - `focus.session.paused`          → fade to 0
+ *   - `focus.session.completed`       → fade out & stop
+ *
+ * Synthesis per `AmbientTrack`:
+ *   - white_noise → looping white-noise buffer through a lowpass
+ *   - rain        → pink-ish filtered noise + sparse randomized droplet taps
+ *   - binaural    → an L/R sine pair (200 / 204 Hz) via a ChannelMerger
+ *                   (needs headphones — the picker shows that hint)
+ *   - lofi        → brown noise + a gentle lowpass wobble (LFO on cutoff) +
+ *                   sparse vinyl-crackle impulses
+ *
+ * An `AudioContext` may only be created/resumed from a user gesture, so
+ * `setTrack` (a click) and `resume()` (called from the session-start click)
+ * unlock it; everything is feature-detected and silently no-ops where the Web
+ * Audio API is unavailable (SSR, old browsers).
  */
 import { AmbientTrack } from "@focusengine/schemas/enums";
 import { bus } from "../events/bus";
 
-const TRACK_SRC: Partial<Record<AmbientTrack, string>> = {
-  [AmbientTrack.WHITE_NOISE]: "/audio/white_noise.mp3",
-  [AmbientTrack.BINAURAL]: "/audio/binaural.mp3",
-  [AmbientTrack.LOFI]: "/audio/lofi.mp3",
-  [AmbientTrack.RAIN]: "/audio/rain.mp3",
-};
+type AudioContextCtor = typeof AudioContext;
 
-/** Clamps to the range `HTMLMediaElement.volume` accepts — it throws
- *  `IndexSizeError` synchronously if written outside [0, 1], so every write
- *  anywhere in this file must be pre-clamped, never assumed in-range. */
+function audioContextCtor(): AudioContextCtor | null {
+  if (typeof window === "undefined") return null;
+  const w = window as unknown as { AudioContext?: AudioContextCtor; webkitAudioContext?: AudioContextCtor };
+  return w.AudioContext ?? w.webkitAudioContext ?? null;
+}
+
 function clampVolume(v: number): number {
   return Math.min(1, Math.max(0, v));
 }
 
+/** Debug view surfaced for offline verification (headless can't hear audio, so
+ *  the evidence is a running context + a non-empty node graph + gain changes). */
+export interface AmbientAudioDebugInfo {
+  available: boolean;
+  contextState: string | null;
+  track: AmbientTrack;
+  nodeCount: number;
+  masterGain: number | null;
+}
+
 export class AmbientAudioEngine {
-  private audio: HTMLAudioElement | null = null;
+  private ctx: AudioContext | null = null;
+  private master: GainNode | null = null;
   private track: AmbientTrack = AmbientTrack.NONE;
-  private fadeHandle: number | null = null;
-  // Bumped by every call that changes playback state (fadeTo/playAtFull/
-  // setTrack). Closures captured by an in-flight rAF loop or setTimeout
-  // compare their captured generation against the current one before acting,
-  // so a superseded fade/timeout becomes a no-op instead of fighting the
-  // newer state change — the "coalescing under rapid state flips" guarantee.
+
+  /** Every node/timer that makes up the CURRENT track's graph, so `setTrack`
+   *  and `destroy` can tear it down completely. */
+  private trackNodes: AudioNode[] = [];
+  private trackTimers: number[] = [];
+
+  /** Bumped by every call that changes playback state (fadeTo/setTrack/stop):
+   *  a superseded rAF fade or a pending stop-timeout compares its captured
+   *  generation and no-ops — the "coalescing under rapid state flips" guard. */
   private generation = 0;
+  private fadeHandle: number | null = null;
+
+  /** Last volume a bus event asked for (so re-selecting a track mid-session
+   *  brings it in at the right level). */
+  private targetVolume = 0;
+
   private unsubscribers: Array<() => void> = [];
 
   constructor() {
-    // SSR guard — this engine is client-only (no HTMLAudioElement on the
-    // server); every method below no-ops when `audio` stays null.
-    if (typeof window === "undefined") return;
-    this.audio = new Audio();
-    this.audio.loop = true;
+    if (typeof window === "undefined") return; // SSR: client-only engine
     this.wireBus();
   }
 
-  /** Cancels any in-flight fade RAF and invalidates its (and any pending
-   *  fade-related timeout's) generation. Call this at the start of every
-   *  method that changes playback state directly, so a stale loop never
-   *  clobbers a fresher one. */
+  private wireBus(): void {
+    this.unsubscribers.push(
+      bus.on("focus.session.started", () => this.playAt(1.0)),
+      bus.on("focus.session.resumed", () => this.playAt(1.0)),
+      bus.on("focus.break.started", () => this.fadeTo(0.5, 400)),
+      bus.on("focus.session.paused", () => this.fadeTo(0, 250)),
+      bus.on("focus.session.completed", () => this.fadeOutAndStop()),
+    );
+  }
+
+  /** Create/resume the AudioContext from within a user gesture. Feature-detected;
+   *  returns false (a silent no-op) where Web Audio is unavailable. */
+  resume(): boolean {
+    if (this.ctx) {
+      if (this.ctx.state === "suspended") void this.ctx.resume().catch(() => {});
+      return true;
+    }
+    const Ctor = audioContextCtor();
+    if (!Ctor) return false;
+    try {
+      this.ctx = new Ctor();
+    } catch {
+      return false;
+    }
+    this.master = this.ctx.createGain();
+    this.master.gain.value = 0;
+    this.master.connect(this.ctx.destination);
+    if (this.ctx.state === "suspended") void this.ctx.resume().catch(() => {});
+    return true;
+  }
+
+  /** Selects (or clears, via `AmbientTrack.NONE`) the track. Rebuilds the graph
+   *  immediately; a track chosen mid-session comes in at the current level. */
+  setTrack(track: AmbientTrack): void {
+    this.track = track;
+    if (typeof window === "undefined") return;
+    this.resume();
+    this.cancelFade();
+    this.teardownGraph();
+    if (track === AmbientTrack.NONE || !this.ctx || !this.master) return;
+    this.buildGraph(track);
+    // Come in at whatever level the last bus event asked for, so a track picked
+    // mid-session is immediately audible (and 0/silent when idle).
+    this.master.gain.value = clampVolume(this.targetVolume);
+  }
+
+  private playAt(volume: number): void {
+    this.targetVolume = clampVolume(volume);
+    if (this.track === AmbientTrack.NONE) return;
+    this.resume();
+    if (!this.ctx || !this.master) return;
+    if (this.trackNodes.length === 0) this.buildGraph(this.track);
+    // A direct set (not a fade) per §7.5's own wording for the "play at 1.0"
+    // rule; also cancels any in-flight fade so a stale ramp can't fight it.
+    this.cancelFade();
+    this.master.gain.value = clampVolume(volume);
+  }
+
+  /** requestAnimationFrame ramp of the MASTER gain from its current value to
+   *  `volume` over `ms` (replaces the old element.volume ramp). */
+  fadeTo(volume: number, ms: number): void {
+    this.targetVolume = clampVolume(volume);
+    if (!this.master) return;
+    const master = this.master;
+    const generation = this.cancelFade();
+
+    const startVolume = clampVolume(master.gain.value);
+    const target = clampVolume(volume);
+    const startTime = performance.now();
+
+    const step = (now: number) => {
+      if (generation !== this.generation) return; // superseded
+      const elapsed = now - startTime;
+      // Clamp both ends: the first rAF timestamp can precede `startTime` by a
+      // hair (negative t flips the ramp's sign and overshoots the [0,1] range).
+      const t = ms <= 0 ? 1 : Math.min(1, Math.max(0, elapsed / ms));
+      master.gain.value = clampVolume(startVolume + (target - startVolume) * t);
+      this.fadeHandle = t < 1 ? requestAnimationFrame(step) : null;
+    };
+    this.fadeHandle = requestAnimationFrame(step);
+  }
+
+  private fadeOutAndStop(): void {
+    if (!this.master) return;
+    const fadeMs = 400;
+    this.fadeTo(0, fadeMs);
+    const generation = this.generation; // snapshot AFTER fadeTo bumped it
+    window.setTimeout(() => {
+      if (generation !== this.generation) return; // a new session restarted
+      this.teardownGraph();
+    }, fadeMs + 20);
+  }
+
   private cancelFade(): number {
     if (this.fadeHandle !== null) {
       cancelAnimationFrame(this.fadeHandle);
@@ -57,102 +179,234 @@ export class AmbientAudioEngine {
     return ++this.generation;
   }
 
-  private wireBus(): void {
-    this.unsubscribers.push(
-      bus.on("focus.session.started", () => this.playAtFull()),
-      bus.on("focus.session.resumed", () => this.playAtFull()),
-      bus.on("focus.break.started", () => this.fadeTo(0.5, 400)),
-      bus.on("focus.session.paused", () => this.fadeTo(0, 250)),
-      bus.on("focus.session.completed", () => this.fadeOutAndStop()),
-    );
-  }
+  // -- Synthesis -----------------------------------------------------------
 
-  /** Selects (or clears, via `AmbientTrack.NONE`) which track plays on the
-   *  next `focus.session.started|resumed` event. */
-  setTrack(track: AmbientTrack): void {
-    this.track = track;
-    if (!this.audio) return;
-    // A fade left over from the previous track (e.g. a pause fade-out still
-    // ramping down) must not resurrect and write to the newly-selected one.
-    this.cancelFade();
-    if (track === AmbientTrack.NONE) {
-      this.audio.pause();
-      this.audio.removeAttribute("src");
-      return;
+  private buildGraph(track: AmbientTrack): void {
+    if (!this.ctx || !this.master) return;
+    switch (track) {
+      case AmbientTrack.WHITE_NOISE:
+        this.buildWhiteNoise();
+        break;
+      case AmbientTrack.RAIN:
+        this.buildRain();
+        break;
+      case AmbientTrack.BINAURAL:
+        this.buildBinaural();
+        break;
+      case AmbientTrack.LOFI:
+        this.buildLofi();
+        break;
+      case AmbientTrack.NONE:
+        break;
     }
-    this.audio.src = TRACK_SRC[track] ?? "";
   }
 
-  /** "focus.session.started|resumed -> play at volume 1.0" (§7.5) — a direct
-   *  set, not a fade, per the spec's own wording distinguishing it from the
-   *  three "fade to ..." rules below. Cancels any in-flight fade first: rapid
-   *  pause/resume toggling was leaving a fade-to-0 loop running after resume
-   *  set volume back to 1, and the orphaned loop would then silently fade
-   *  the just-resumed track back toward 0 a frame later. */
-  private playAtFull(): void {
-    if (!this.audio || this.track === AmbientTrack.NONE) return;
-    this.cancelFade();
-    this.audio.volume = clampVolume(1.0);
-    void this.audio.play().catch(() => {
-      // Autoplay can be blocked until a user gesture occurs; the next bus
-      // event (e.g. resuming after a break) retries.
+  /** A looping buffer of `seconds` filled by `fill(channelData)`. */
+  private noiseSource(seconds: number, fill: (data: Float32Array) => void): AudioBufferSourceNode {
+    const ctx = this.ctx as AudioContext;
+    const length = Math.floor(ctx.sampleRate * seconds);
+    const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+    fill(buffer.getChannelData(0));
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.loop = true;
+    return src;
+  }
+
+  private buildWhiteNoise(): void {
+    const ctx = this.ctx as AudioContext;
+    const src = this.noiseSource(2, (data) => {
+      for (let i = 0; i < data.length; i += 1) data[i] = Math.random() * 2 - 1;
+    });
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 1400;
+    const gain = ctx.createGain();
+    gain.gain.value = 0.35;
+    src.connect(filter).connect(gain).connect(this.master as GainNode);
+    src.start();
+    this.trackNodes.push(src, filter, gain);
+  }
+
+  private buildRain(): void {
+    const ctx = this.ctx as AudioContext;
+    // Pink-ish bed: white noise heavily lowpassed.
+    const bed = this.noiseSource(2, (data) => {
+      let last = 0;
+      for (let i = 0; i < data.length; i += 1) {
+        const white = Math.random() * 2 - 1;
+        last = (last + 0.02 * white) / 1.02;
+        data[i] = last * 3.2;
+      }
+    });
+    const bedFilter = ctx.createBiquadFilter();
+    bedFilter.type = "lowpass";
+    bedFilter.frequency.value = 1000;
+    const bedGain = ctx.createGain();
+    bedGain.gain.value = 0.5;
+    bed.connect(bedFilter).connect(bedGain).connect(this.master as GainNode);
+    bed.start();
+    this.trackNodes.push(bed, bedFilter, bedGain);
+
+    // Sparse randomized droplet taps: short filtered-noise bursts.
+    const droplets = ctx.createGain();
+    droplets.gain.value = 0.6;
+    droplets.connect(this.master as GainNode);
+    this.trackNodes.push(droplets);
+    const timer = window.setInterval(() => {
+      if (!this.ctx) return;
+      const count = 1 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < count; i += 1) this.dropletTap(droplets, Math.random() * 0.12);
+    }, 180);
+    this.trackTimers.push(timer);
+  }
+
+  private dropletTap(dest: GainNode, delaySeconds: number): void {
+    const ctx = this.ctx as AudioContext;
+    const t0 = ctx.currentTime + delaySeconds;
+    const burst = this.noiseSource(0.05, (data) => {
+      for (let i = 0; i < data.length; i += 1) data[i] = Math.random() * 2 - 1;
+    });
+    burst.loop = false;
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = 1500 + Math.random() * 3500;
+    bp.Q.value = 6;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t0);
+    env.gain.linearRampToValueAtTime(0.5 + Math.random() * 0.4, t0 + 0.004);
+    env.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.09);
+    burst.connect(bp).connect(env).connect(dest);
+    burst.start(t0);
+    burst.stop(t0 + 0.12);
+  }
+
+  private buildBinaural(): void {
+    const ctx = this.ctx as AudioContext;
+    const merger = ctx.createChannelMerger(2);
+    const gain = ctx.createGain();
+    gain.gain.value = 0.28;
+    merger.connect(gain).connect(this.master as GainNode);
+    this.trackNodes.push(merger, gain);
+
+    const freqs = [200, 204];
+    freqs.forEach((freq, channel) => {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const oscGain = ctx.createGain();
+      oscGain.gain.value = 1;
+      osc.connect(oscGain);
+      oscGain.connect(merger, 0, channel);
+      osc.start();
+      this.trackNodes.push(osc, oscGain);
     });
   }
 
-  /** requestAnimationFrame ramp from the current volume to `volume` over `ms`. */
-  fadeTo(volume: number, ms: number): void {
-    if (!this.audio) return;
-    const audio = this.audio;
-    const generation = this.cancelFade();
+  private buildLofi(): void {
+    const ctx = this.ctx as AudioContext;
+    // Brown noise (integrated white noise).
+    const src = this.noiseSource(3, (data) => {
+      let last = 0;
+      for (let i = 0; i < data.length; i += 1) {
+        const white = Math.random() * 2 - 1;
+        last = (last + 0.02 * white) / 1.02;
+        data[i] = last * 3.0;
+      }
+    });
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 700;
+    const gain = ctx.createGain();
+    gain.gain.value = 0.55;
+    src.connect(filter).connect(gain).connect(this.master as GainNode);
+    src.start();
+    this.trackNodes.push(src, filter, gain);
 
-    const startVolume = clampVolume(audio.volume);
-    const target = clampVolume(volume);
-    const startTime = performance.now();
+    // Gentle lowpass wobble: an LFO modulating the cutoff.
+    const lfo = ctx.createOscillator();
+    lfo.type = "sine";
+    lfo.frequency.value = 0.12;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 220;
+    lfo.connect(lfoGain).connect(filter.frequency);
+    lfo.start();
+    this.trackNodes.push(lfo, lfoGain);
 
-    const step = (now: number) => {
-      // Superseded by a newer fadeTo/playAtFull/setTrack call — stop
-      // instead of continuing to write a stale ramp over the current one.
-      if (generation !== this.generation) return;
-      const elapsed = now - startTime;
-      // Clamp BOTH ends: `elapsed` can be negative on a fade's first frame
-      // (the rAF timestamp can precede the `performance.now()` read above by
-      // a hair), and an unclamped negative `t` flips the sign of
-      // `(target - startVolume) * t`, pushing the result past whichever of
-      // startVolume/target is the upper bound — that's the `1.0116`
-      // IndexSizeError from repeated pause/resume toggling.
-      const t = ms <= 0 ? 1 : Math.min(1, Math.max(0, elapsed / ms));
-      audio.volume = clampVolume(startVolume + (target - startVolume) * t);
-      this.fadeHandle = t < 1 ? requestAnimationFrame(step) : null;
+    // Sparse vinyl-crackle impulses.
+    const crackle = ctx.createGain();
+    crackle.gain.value = 0.25;
+    crackle.connect(this.master as GainNode);
+    this.trackNodes.push(crackle);
+    const timer = window.setInterval(() => {
+      if (!this.ctx) return;
+      if (Math.random() < 0.7) this.crackleImpulse(crackle, Math.random() * 0.1);
+    }, 120);
+    this.trackTimers.push(timer);
+  }
+
+  private crackleImpulse(dest: GainNode, delaySeconds: number): void {
+    const ctx = this.ctx as AudioContext;
+    const t0 = ctx.currentTime + delaySeconds;
+    const burst = this.noiseSource(0.02, (data) => {
+      for (let i = 0; i < data.length; i += 1) data[i] = Math.random() * 2 - 1;
+    });
+    burst.loop = false;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.6 + Math.random() * 0.4, t0);
+    env.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.02);
+    burst.connect(env).connect(dest);
+    burst.start(t0);
+    burst.stop(t0 + 0.04);
+  }
+
+  private teardownGraph(): void {
+    for (const timer of this.trackTimers) window.clearInterval(timer);
+    this.trackTimers = [];
+    for (const node of this.trackNodes) {
+      try {
+        if (node instanceof AudioScheduledSourceNode) node.stop();
+      } catch {
+        /* already stopped */
+      }
+      try {
+        node.disconnect();
+      } catch {
+        /* already disconnected */
+      }
+    }
+    this.trackNodes = [];
+  }
+
+  getDebugInfo(): AmbientAudioDebugInfo {
+    return {
+      available: this.ctx !== null,
+      contextState: this.ctx?.state ?? null,
+      track: this.track,
+      nodeCount: this.trackNodes.length,
+      masterGain: this.master ? this.master.gain.value : null,
     };
-    this.fadeHandle = requestAnimationFrame(step);
   }
 
-  /** "focus.session.completed -> fade out & stop" (§7.5). */
-  private fadeOutAndStop(): void {
-    if (!this.audio) return;
-    const audio = this.audio;
-    const fadeMs = 400;
-    this.fadeTo(0, fadeMs);
-    // Snapshot the generation *after* fadeTo (which just bumped it) so this
-    // timeout can detect being superseded too — e.g. a session restarting
-    // within the 420ms window must not have its fresh playback paused out
-    // from under it by this stale callback.
-    const generation = this.generation;
-    window.setTimeout(() => {
-      if (generation !== this.generation) return;
-      audio.pause();
-      audio.currentTime = 0;
-    }, fadeMs + 20);
-  }
-
-  /** Releases bus subscriptions and stops playback — call on teardown. */
+  /** Releases bus subscriptions, tears down the graph, and closes the context. */
   destroy(): void {
     for (const unsubscribe of this.unsubscribers) unsubscribe();
     this.unsubscribers = [];
     this.cancelFade();
-    this.audio?.pause();
+    this.teardownGraph();
+    if (this.ctx) {
+      void this.ctx.close().catch(() => {});
+      this.ctx = null;
+      this.master = null;
+    }
   }
 }
 
 /** Process-wide singleton; safe to import anywhere (no-ops under SSR). */
 export const ambientAudioEngine = new AmbientAudioEngine();
+
+// A tiny debug seam for offline verification only (headless browsers can't
+// render audio, so the evidence is the live graph + gain). Harmless in prod.
+if (typeof window !== "undefined") {
+  (window as unknown as { __focusAudio?: AmbientAudioEngine }).__focusAudio = ambientAudioEngine;
+}
